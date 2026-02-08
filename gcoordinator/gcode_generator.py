@@ -1,7 +1,5 @@
-import os
-import json
 import numpy as np
-from gcoordinator.settings                   import get_default_settings, load_settings
+from gcoordinator.settings                   import get_default_settings, get_settings
 from gcoordinator.path_generator             import Path
 from gcoordinator.path_generator             import flatten_path_list
 from gcoordinator.utils.coords               import get_distances_between_coords
@@ -9,7 +7,6 @@ from gcoordinator.kinematics.kin_bed_rotate  import BedRotate
 from gcoordinator.kinematics.kin_cartesian   import Cartesian
 from gcoordinator.kinematics.kin_bed_tilt_bc import BedTiltBC
 from gcoordinator.kinematics.kin_nozzle_tilt import NozzleTilt
-from gcoordinator.settings                   import template_settings
 
 class GCode:
     """
@@ -19,23 +16,17 @@ class GCode:
         full_object (list): A list of `Path` objects representing the paths to be printed.
         settings_path (str): The path to the settings pickle file.
         default_settings (dict): A dictionary containing the default settings.
-        gcode (file object): The file object for the generated G-code.
-        start_gcode_path (str): The path to the file containing the start G-code.
-        start_gcode_txt (str): The text of the start G-code.
-        end_gcode_path (str): The path to the file containing the end G-code.
-        end_gcode_txt (str): The text of the end G-code.
+        gcode (str): The generated G-code text string.
 
     Methods:
         __init__(self, full_object:list) -> None: Initializes a new `GCode` object with the given `full_object`.
-        save(self, file_path:str) -> None: Saves the generated G-code to a file at the specified file path.
+        generate(self) -> str: Generates and returns the complete G-code as a string.
         generate_gcode(self) -> None: Generates G-code instructions for the full object.
         print_path(self, path:Path) -> None: Generates G-code instructions for printing a given path.
         travel_from_path_to_path(self, curr_path:Path, next_path:Path) -> None: Generates G-code instructions for traveling from the end of `curr_path` to the start of `next_path`.
         travel_to_first_point(self, first_path:Path) -> None: Generates G-code instructions for traveling to the first point of the first path in the full object.
         set_initial_settings(self) -> str: Generates G-code commands to set the initial printer settings.
         apply_path_settings(self, path) -> None: Generate G-code commands to apply the settings of the given `path` object.
-        start_gcode(self, file_path) -> None: Sets the path to the start G-code file.
-        end_gcode(self, file_path) -> None: Sets the file path for the end G-code script.
         apply_defaults_to_instances(self, full_object, default_settings) -> None: Applies the default settings to the given `full_object`.
     """
 
@@ -51,52 +42,25 @@ class GCode:
         """
         self.full_object = flatten_path_list(full_object) # list of Path objects
         
-        try:
-            self.settings_path = '.temp_config.json'
-            with open(self.settings_path, 'r') as f:
-                self.settings = json.load(f)
-            
-        except:
-            self.settings = template_settings # gcoordinator/settings.py
-
+        self.settings = get_settings()
         self.default_settings = get_default_settings(self.settings)
         self.apply_defaults_to_instances(self.full_object, self.default_settings)
 
-        self.gcode            = None              # gcode file object
-        self.start_gcode_path = 'start_gcode.txt'
-        self.start_gcode_txt  = ''
-        self.end_gcode_path   = 'end_gcode.txt'
-        self.end_gcode_txt    = ''
+        self.gcode = ''  # gcode text string
 
-    def save(self, file_path:str) -> None:
+    def generate(self) -> str:
         """
-        Saves the generated G-code to a file at the specified file path.
-
-        Args:
-            file_path (str): The path to the file where the G-code will be saved.
+        Generates and returns the complete G-code as a string.
 
         Returns:
-            None.
+            str: The complete G-code text.
         """
-        self.gcode = open(file_path, 'w', encoding='utf-8')
-        
-        with open(self.start_gcode_path, 'r') as f:
-            self.start_gcode_txt = f.read()
-        self.gcode.write(self.start_gcode_txt)
+        self.gcode = ''
         
         self.set_initial_settings()
         self.generate_gcode()
         
-        with open(self.end_gcode_path, 'r') as f:
-            self.end_gcode_txt = f.read()   
-        self.gcode.write(self.end_gcode_txt)
-        
-        self.gcode.close()
-        if os.path.exists(".temp_config.json"):
-            # remove the temporary config file
-            os.remove(".temp_config.json")
-        else:
-            print(".temp_config.json does not exist")
+        return self.gcode
 
     def generate_gcode(self) -> None:
         """
@@ -147,7 +111,7 @@ class GCode:
             txt = BedRotate.generate_gcode_of_path(path)
             
 
-        self.gcode.write(txt)
+        self.gcode += txt
 
     def travel_from_path_to_path(self, curr_path:Path, next_path:Path) -> None:
         """
@@ -192,7 +156,7 @@ class GCode:
         # so the M83 command is used to specify the extrusion amount as relative. 
         # Will be rewritten to program using M82 absolute extrusion.
         txt += f'G90 \nM83 \n'
-        self.gcode.write(txt)
+        self.gcode += txt
 
     def travel_to_first_point(self, first_path:Path) -> None:
         """
@@ -212,7 +176,7 @@ class GCode:
         txt += f'X{first_path.x[0]+first_path.x_origin} '
         txt += f'Y{first_path.y[0]+first_path.y_origin} '
         txt += f'Z{first_path.z[0]}\n'
-        self.gcode.write(txt)
+        self.gcode += txt
 
     def set_initial_settings(self) -> str:
         """
@@ -229,7 +193,7 @@ class GCode:
         txt += f'M109 S{self.default_settings["nozzle_temperature"]} \n'
         txt += f'M106 S{self.default_settings["fan_speed"]} \n'
         txt += f'M83 ;relative extrusion mode \n'
-        self.gcode.write(txt)
+        self.gcode += txt
     
     def apply_path_settings(self, path):
         """
@@ -249,32 +213,7 @@ class GCode:
             txt += f'M140 S{path.bed_temperature} \n'
         if path.fan_speed != self.default_settings['fan_speed']:
             txt += f'M106 S{path.fan_speed} \n'
-        self.gcode.write(txt)
-
-    def start_gcode(self, file_path):
-        """
-        Sets the path to the start G-code file.
-    
-        Args:
-            file_path (str): The path to the start G-code file.
-
-        Returns:
-            None
-        """
-        self.start_gcode_path = file_path
-        
-
-    def end_gcode(self, file_path):
-        """
-        Sets the file path for the end G-code script.
-
-        Args:
-            file_path (str): The file path for the end G-code script.
-
-        Returns:
-            None
-        """
-        self.end_gcode_path = file_path
+        self.gcode += txt
 
     def extrusion_calculator(self, path):
         """

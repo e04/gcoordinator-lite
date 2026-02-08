@@ -1,4 +1,37 @@
-import json
+_current_settings = None
+
+
+def set_settings(settings: dict) -> None:
+    """
+    Set the global settings for the gcoordinator library.
+    
+    Args:
+        settings (dict): A dictionary containing the settings.
+    
+    Example:
+        >>> import gcoordinator as gc
+        >>> gc.set_settings({
+        ...     "Print": {...},
+        ...     "Hardware": {...},
+        ...     "Kinematics": {...}
+        ... })
+    """
+    global _current_settings
+    _current_settings = settings
+
+
+def get_settings() -> dict:
+    """
+    Get the current global settings. Returns template_settings if no settings have been set.
+    
+    Returns:
+        dict: The current settings dictionary.
+    """
+    global _current_settings
+    if _current_settings is None:
+        return template_settings
+    return _current_settings
+
 
 def get_default_settings(settings):
     """
@@ -44,38 +77,6 @@ def get_default_settings(settings):
     }
 
     return default_settings
-
-
-
-
-def load_settings(config_path):
-    """
-    Loads the settings from a JSON config file.
-    The format of the JSON file is as follows:
-    https://gcoordinator.readthedocs.io/en/latest/tutorials/tutorial_4.html
-
-    Args:
-        config_path (str): The path to the JSON config file.
-
-    Returns:
-        None
-
-    Raises:
-        json.JSONDecodeError: If the config file has an invalid JSON format.
-
-    """
-    try:
-        with open(config_path, 'r') as config_file:
-            settings_dict = json.load(config_file)
-        settings_name = '.temp_config.json'
-        with open(settings_name, 'w') as temp_config:
-            json.dump(settings_dict, temp_config, indent=4)
-
-    except json.JSONDecodeError:
-        print("Error: Invalid JSON format in the config file. Using default settings.")
-    
-
-
 
 template_settings = {
     "Print": {

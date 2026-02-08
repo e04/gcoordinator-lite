@@ -1,7 +1,5 @@
-import os
 import json
 import math
-import pickle
 import numpy as np
 from gcoordinator.kinematics.kin_base import Kinematics
 from gcoordinator.settings            import template_settings

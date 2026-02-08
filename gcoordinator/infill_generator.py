@@ -11,9 +11,9 @@ Functions:
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.path import Path as matlabPath
 from gcoordinator.path_generator import Path, PathList
+from gcoordinator.utils.contour import find_contours
+from gcoordinator.utils.polygon import points_in_polygon
 
 
 
@@ -81,11 +81,9 @@ def gyroid_infill(path, infill_distance=1, value=0):
         y_list = path.y
 
         # Determine the inside region
-        inside = np.ones_like(equation) # outside = 1
-        path = matlabPath(np.column_stack([x_list, y_list]))
-
+        polygon = np.column_stack([x_list, y_list])
         points = np.column_stack((X.flatten(), Y.flatten()))
-        inside = path.contains_points(points) # inside = 0
+        inside = points_in_polygon(points, polygon)
         inside = inside.reshape(X.shape).astype(float)
         inside[inside == 1] = -1 # change inside to -1
         inside[inside == 0] = 1  # Change outside  to 1
@@ -99,20 +97,17 @@ def gyroid_infill(path, infill_distance=1, value=0):
     # Replace -1 with np.nan
     result[result == 1] = np.nan
 
-    # Plot the slices
+    # Calculate contours
     slice_plane = equation * result
-    contours = plt.contour(x, y, slice_plane, levels=[0], colors='black')
+    contour_paths = find_contours(x, y, slice_plane, level=0)
 
     infill_path_list = []
-    for contour in contours.collections:
-        paths = contour.get_paths()
-        for path in paths:
-            points = path.vertices
-            x_coords = points[:, 0]
-            y_coords = points[:, 1]
-            z_coords = np.full_like(x_coords, z_height)
-            wall = Path(x_coords, y_coords, z_coords)
-            infill_path_list.append(wall)
+    for contour_path in contour_paths:
+        x_coords = contour_path[:, 0]
+        y_coords = contour_path[:, 1]
+        z_coords = np.full_like(x_coords, z_height)
+        wall = Path(x_coords, y_coords, z_coords)
+        infill_path_list.append(wall)
 
     return PathList(infill_path_list)
 
@@ -164,11 +159,9 @@ def line_infill(path, infill_distance=1, angle=np.pi/4):
         x_list = path.x
         y_list = path.y        
         # Determine the inside region
-        inside = np.ones_like(equation) # outside = 1
-        path = matlabPath(np.column_stack([x_list, y_list]))
-        
+        polygon = np.column_stack([x_list, y_list])
         points = np.column_stack((X.flatten(), Y.flatten()))
-        inside = path.contains_points(points) # inside = 0
+        inside = points_in_polygon(points, polygon)
         inside = inside.reshape(X.shape).astype(float)
         inside[inside == 1] = -1 # change inside to -1
         inside[inside == 0] = 1  # Change outside  to 1
@@ -182,18 +175,15 @@ def line_infill(path, infill_distance=1, angle=np.pi/4):
     # Replace -1 with np.nan
     result[result == 1] = np.nan
 
-    # Plot the slices
+    # Calculate contours
     slice_plane = equation * result
-    contours = plt.contour(x, y, slice_plane, levels=[0], colors='black')
+    contour_paths = find_contours(x, y, slice_plane, level=0)
+    
     infill_path_list = []
-    for contour in contours.collections:
-        
-        paths = contour.get_paths()
-        for path in paths:
-            points = path.vertices
-            x_coords = points[:, 0]
-            y_coords = points[:, 1]
-            z_coords = np.full_like(x_coords, z_height)
-            wall = Path(x_coords, y_coords, z_coords)
-            infill_path_list.append(wall)
+    for contour_path in contour_paths:
+        x_coords = contour_path[:, 0]
+        y_coords = contour_path[:, 1]
+        z_coords = np.full_like(x_coords, z_height)
+        wall = Path(x_coords, y_coords, z_coords)
+        infill_path_list.append(wall)
     return PathList(infill_path_list)

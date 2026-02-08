@@ -1,5 +1,3 @@
-import numpy as np
-import math
 from gcoordinator.kinematics.kin_base import Kinematics
 
 class Cartesian(Kinematics):
